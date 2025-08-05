@@ -35,7 +35,7 @@ const UploadPDF = () => {
       }
 
       const result = await response.json();
-      console.log("Upload result:", result);
+      console.log("file content: ", result.file_content);
       setUploadResult(result);
       alert("File uploaded successfully!");
     } catch (error) {

@@ -7,6 +7,9 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 import uuid
 import os
+from utils.PdfTextExtractor import extract_text_from_pdf_bytes
+from utils.EmbeddingGenerator import EmbeddingGenerator
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -64,16 +67,32 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         print(f"Uploading file: {file.filename}")
         
-        # Generate unique filename
         file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
         unique_filename = f"{uuid.uuid4()}.{file_extension}" if file_extension else str(uuid.uuid4())
         
-        # Read file content
         file_content = await file.read()
 
-        print('file content::', file_content)
-        
-        
+        extracted_text = extract_text_from_pdf_bytes(file_content)
+
+        if extracted_text:
+            # Generate embeddings using LangChain
+            embedding_generator = EmbeddingGenerator()
+            
+            metadata = {
+                "filename": file.filename,
+                "s3_key": unique_filename,
+                "upload_timestamp": datetime.utcnow().isoformat()
+            }
+            
+            chunks, embeddings = embedding_generator.process_resume_text(
+                extracted_text, 
+                metadata
+            )
+
+            print(embeddings)
+            
+            print(f"Created {len(chunks)} chunks with embeddings")
+
         # Upload to S3
         s3_client.put_object(
             Bucket=S3_BUCKET_NAME,
@@ -95,7 +114,8 @@ async def upload_file(file: UploadFile = File(...)):
             "filename": file.filename,
             "s3_key": unique_filename,
             "s3_url": s3_url,
-            "file_size": len(file_content)
+            "file_size": len(file_content), 
+            "file_content": extracted_text
         }
         
     except NoCredentialsError:
