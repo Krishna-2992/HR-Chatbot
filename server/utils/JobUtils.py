@@ -14,4 +14,4 @@ def build_job_embedding_text(job: JobRole) -> str:
     if req.certifications: 
         lines.append(f"Certifications: {' ,'.join(req.certifications)}")
 
-    return '/n'.join(lines)
+    return '\n'.join(lines)

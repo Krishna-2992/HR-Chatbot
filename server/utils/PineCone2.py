@@ -49,8 +49,18 @@ class PineCone2:
         uuids = [str(uuid4()) for _ in range(len(documents))]
         self.vector_store.add_documents(documents=documents, ids=uuids)
 
+    def add_jd_to_vector_storage(self, text, metadata): 
+        document = Document(
+            page_content=text, 
+            metadata=metadata
+        )
+        documents = [document]
+        uuids = [str(uuid4()) for _ in range(len(documents))]
+        self.vector_store.add_documents(documents=documents, ids=uuids)
+        return uuids[0]
+
     def retrieve_documents(self):
-        results = self.vector_store.similarity_search("chocolate chip pancakes", k=1)
+        results = self.vector_store.similarity_search("Job description", k=1)
         return [
             {
                 "content": doc.page_content,
@@ -59,5 +69,9 @@ class PineCone2:
             for doc in results
         ]
 
-
-
+    def fetch_embedding_by_id(self, vector_id: str) -> list:
+        # Fetch vector from Pinecone index by ID
+        vector_response = self.index.fetch(ids=[vector_id])
+        if vector_id in vector_response.vectors:
+            return vector_response.vectors[vector_id].values
+        return None

@@ -37,6 +37,7 @@ const UploadJob = () => {
     },
     application_deadline: getDefaultDeadline(),
     job_status: "draft",
+    job_uuid: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);

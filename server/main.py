@@ -13,6 +13,7 @@ from datetime import datetime
 from utils.JobUtils import build_job_embedding_text
 # from utils.PineConeStore import PineconeStore
 from utils.PineCone2 import PineCone2
+from utils.CosineSimilarity import cosine_similarity
  
 # Load environment variables
 load_dotenv()
@@ -54,19 +55,20 @@ def root_route():
 
 @app.post("/jobs")
 def create_job(job: JobRole): 
-    print("job: ", job)
-
-    result = job_posting.insert_one(job.model_dump())
-    job_id = str(result.inserted_id)
 
     embedding_text = build_job_embedding_text(job)
 
-    embedding_generator = EmbeddingGenerator()
-    chunks, embeddings = embedding_generator.process_resume_text(embedding_text)
-    chunk_texts = [chunk.page_content for chunk in chunks]
+    metadata = {"source": "job description"}
 
-    # vector_store = PineconeStore()
-    # vector_store.save_vectors(embeddings, {"id": job_id, "source": "example.pdf"}, chunk_texts)
+    pc = PineCone2()
+    job_uuid = pc.add_jd_to_vector_storage(embedding_text, metadata)
+
+    print("job uploaded to vector storage")
+
+    job.job_uuid=job_uuid
+    
+    result = job_posting.insert_one(job.model_dump())
+    job_id = str(result.inserted_id)
     
     return {"id": job_id}
 
@@ -89,6 +91,8 @@ async def upload_file(file: UploadFile = File(...)):
 
         extracted_text = extract_text_from_pdf_bytes(file_content)
 
+        job_uuid = "40cfd1e2-3ba1-423f-9642-d221bea798c2"
+
         if extracted_text:
             embedding_generator = EmbeddingGenerator()
             
@@ -103,9 +107,23 @@ async def upload_file(file: UploadFile = File(...)):
                 metadata
             )
 
-            print(embeddings)
+            pinecone_instance = PineCone2()
+            job_embedding = pinecone_instance.fetch_embedding_by_id(job_uuid)
+            if job_embedding is None:
+                # handle error: job UUID not found
+                pass
+
+            similarities = [cosine_similarity(job_embedding, emb) for emb in embeddings]
+
+            # Example aggregation: max similarity score
+            max_similarity = max(similarities) if similarities else 0
+
+            print(f"Max similarity score with job {job_uuid}: {max_similarity}")
+
+
+            # print(embeddings)
             
-            print(f"Created {len(chunks)} chunks with embeddings")
+            # print(f"Created {len(chunks)} chunks with embeddings")
 
         # Upload to S3
         s3_client.put_object(
@@ -129,7 +147,7 @@ async def upload_file(file: UploadFile = File(...)):
             "s3_key": unique_filename,
             "s3_url": s3_url,
             "file_size": len(file_content), 
-            "file_content": extracted_text
+            "file_content": extracted_text, 
         }
         
     except NoCredentialsError:

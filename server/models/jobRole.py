@@ -58,4 +58,5 @@ class JobRole(BaseModel):
     application_deadline: datetime
     posted_date: datetime = Field(default_factory=datetime.utcnow)
     job_status: JobStatus = JobStatus.DRAFT
+    job_uuid: str
     
