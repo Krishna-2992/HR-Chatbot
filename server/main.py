@@ -10,7 +10,10 @@ import os
 from utils.PdfTextExtractor import extract_text_from_pdf_bytes
 from utils.EmbeddingGenerator import EmbeddingGenerator
 from datetime import datetime
-
+from utils.JobUtils import build_job_embedding_text
+# from utils.PineConeStore import PineconeStore
+from utils.PineCone2 import PineCone2
+ 
 # Load environment variables
 load_dotenv()
 
@@ -52,8 +55,20 @@ def root_route():
 @app.post("/jobs")
 def create_job(job: JobRole): 
     print("job: ", job)
+
     result = job_posting.insert_one(job.model_dump())
-    return {"id": str(result.inserted_id)}
+    job_id = str(result.inserted_id)
+
+    embedding_text = build_job_embedding_text(job)
+
+    embedding_generator = EmbeddingGenerator()
+    chunks, embeddings = embedding_generator.process_resume_text(embedding_text)
+    chunk_texts = [chunk.page_content for chunk in chunks]
+
+    # vector_store = PineconeStore()
+    # vector_store.save_vectors(embeddings, {"id": job_id, "source": "example.pdf"}, chunk_texts)
+    
+    return {"id": job_id}
 
 @app.get("/jobs")
 def get_jobs(): 
@@ -75,7 +90,6 @@ async def upload_file(file: UploadFile = File(...)):
         extracted_text = extract_text_from_pdf_bytes(file_content)
 
         if extracted_text:
-            # Generate embeddings using LangChain
             embedding_generator = EmbeddingGenerator()
             
             metadata = {
@@ -136,3 +150,15 @@ async def upload_file(file: UploadFile = File(...)):
             status_code=500, 
             detail=f"Upload failed: {str(e)}"
         )
+    
+@app.get("/invokevs/")
+async def invoke():
+    pinecone_obj = PineCone2()
+    pinecone_obj.add2VectorStore()
+    return {"status": "documents added"}
+
+@app.get("/retrievevs/")
+async def invoke():
+    pinecone_obj = PineCone2()
+    docs = pinecone_obj.retrieve_documents()
+    return {"documents": docs}
